@@ -1,0 +1,6 @@
+{
+  "name": "Aegis Hospital Management & Holographic Risk Suite",
+  "description": "Hospital analytics and management system with yearly/weekly/daily visits, first-time vs returning patient registry, disease reports and doctor availability, and holographic anatomical risk scanner.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
