@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Hospital staff and practitioner profile",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth user UID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Staff email address"
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Staff full name and title"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["Doctor", "Nurse", "Admin", "Staff"],
+          "description": "Hospital staff clinical role"
+        },
+        "department": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Clinical department assignment"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Registered hospital patient profile and visit records",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique patient ID like PT-2026-0104"
+        },
+        "nationalId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "National health identification code"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Patient legal full name"
+        },
+        "age": {
+          "type": "number",
+          "description": "Patient age in years"
+        },
+        "dob": {
+          "type": "string",
+          "description": "Date of birth (YYYY-MM-DD)"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["Male", "Female", "Other"],
+          "description": "Gender identification"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Primary contact telephone"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Electronic contact email"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Residential address"
+        },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+          "description": "ABO and Rh blood group"
+        },
+        "allergies": {
+          "type": "array",
+          "description": "Documented medical and drug allergies"
+        },
+        "chronicConditions": {
+          "type": "array",
+          "description": "Pre-existing chronic conditions"
+        },
+        "emergencyContact": {
+          "type": "object",
+          "description": "Next-of-kin emergency contact details"
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "Date first admitted to hospital"
+        },
+        "visitCount": {
+          "type": "number",
+          "description": "Total hospital admissions and visits"
+        },
+        "visits": {
+          "type": "array",
+          "description": "Chronological clinical visit encounters"
+        },
+        "primaryRiskOrgan": {
+          "type": "string",
+          "description": "Anatomical risk organ identified"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Staff UID who registered the patient"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Record last modification timestamp"
+        }
+      },
+      "required": ["id", "fullName", "phone", "bloodGroup", "visitCount", "visits"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Medical and clinical staff member user documents"
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Hospital electronic health records and patient visits"
+    }
+  }
+}
