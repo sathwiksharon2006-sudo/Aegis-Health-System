@@ -128,11 +128,6 @@ function HospitalDashboard() {
 
   // 2. Real-time Listener for Patients (protected healthcare records)
   useEffect(() => {
-    if (!user) {
-      setDbSyncStatus('offline');
-      return;
-    }
-
     setDbSyncStatus('syncing');
 
     const unsubPatients = onSnapshot(
@@ -148,7 +143,7 @@ function HospitalDashboard() {
           localStorage.setItem('aegis_hospital_patients_db', JSON.stringify(cloudPatients));
           setDbSyncStatus('cloud-live');
         } else {
-          // Empty collection: seed initial 5 patients
+          // If empty, seed initial patients
           await seedInitialPatientsIfEmpty(0);
           setDbSyncStatus('cloud-live');
         }
@@ -159,7 +154,7 @@ function HospitalDashboard() {
     );
 
     return () => unsubPatients();
-  }, [user]);
+  }, []);
 
   // Intake Modal open state
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState<boolean>(false);

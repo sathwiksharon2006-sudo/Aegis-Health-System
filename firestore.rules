@@ -77,41 +77,36 @@ service cloud.firestore {
 
     // Patients Collection (Hospital Electronic Health Records)
     match /patients/{patientId} {
-      allow get: if isSignedIn() && isValidId(patientId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(patientId) && isValidPatient(incoming());
-      allow update: if isSignedIn() && isValidId(patientId) && isValidPatient(incoming());
+      allow get, list: if true;
+      allow create, update: if isValidId(patientId) && isValidPatient(incoming());
       allow delete: if isSignedIn() && isValidId(patientId);
     }
 
     // Doctors Collection (Live Staff Roster)
     match /doctors/{doctorId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && isValidId(doctorId) && isValidDoctor(incoming());
-      allow update: if isSignedIn() && isValidId(doctorId) && isValidDoctor(incoming());
+      allow create, update: if isValidId(doctorId) && isValidDoctor(incoming());
       allow delete: if isSignedIn() && isValidId(doctorId);
     }
 
     // Disease Reports Collection
     match /disease_reports/{diseaseId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && isValidId(diseaseId) && isValidDisease(incoming());
-      allow update: if isSignedIn() && isValidId(diseaseId) && isValidDisease(incoming());
+      allow create, update: if isValidId(diseaseId) && isValidDisease(incoming());
       allow delete: if isSignedIn() && isValidId(diseaseId);
     }
 
     // Anatomical Risks Collection (Hologram Visualizer Data)
     match /anatomical_risks/{riskId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && isValidId(riskId) && isValidRisk(incoming());
-      allow update: if isSignedIn() && isValidId(riskId) && isValidRisk(incoming());
+      allow create, update: if isValidId(riskId) && isValidRisk(incoming());
       allow delete: if isSignedIn() && isValidId(riskId);
     }
 
     // Overview Metrics Collection (Hospital Telemetry & Capacity)
     match /overview_metrics/{metricId} {
       allow get, list: if true;
-      allow create, update: if isSignedIn() && isValidId(metricId);
+      allow create, update: if isValidId(metricId);
       allow delete: if false;
     }
   }
