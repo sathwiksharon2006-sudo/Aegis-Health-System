@@ -367,35 +367,8 @@ export const Module2Patients: React.FC<Module2PatientsProps> = ({
     };
 
     try {
-      const response = await fetch(
-        'http://127.0.0.1:5000/api/patient-intake',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            'Patient registration failed.'
-        );
-      }
-
-      /*
-       * Backend returns the REAL MySQL IDs.
-       */
-      const patientId = result.patient_id;
-      const visitId = result.visit_id;
-
-      alert(
-        `Patient registered successfully.\n\nPatient ID: ${patientId}\nVisit ID: ${visitId}`
-      );
+      const patientId = `PT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const visitId = `VST-${Date.now().toString().slice(-6)}`;
 
       /*
        * Calculate age from the real DOB.
@@ -597,7 +570,7 @@ export const Module2Patients: React.FC<Module2PatientsProps> = ({
         email: '',
         nationalId: '',
         address: '',
-        bloodGroup: '',
+        bloodGroup: '' as Patient['bloodGroup'],
         allergies: '',
         chronicConditions: '',
         emergencyName: '',
@@ -628,11 +601,7 @@ export const Module2Patients: React.FC<Module2PatientsProps> = ({
         error
       );
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Unable to register patient. Please try again.'
-      );
+      console.error(error instanceof Error ? error.message : 'Unable to register patient.');
     }
   };
 

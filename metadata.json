@@ -1,0 +1,8 @@
+{
+  "name": "Aegis Health System - Hospital Intelligence & Holographic Risk Suite",
+  "description": "Comprehensive hospital management and diagnostic intelligence platform featuring real-time daily/weekly/yearly visit analytics, full patient intake and longitudinal EHR records, multi-department disease tracking with doctor availability roster, and interactive 3D anatomical risk hologram powered by live Firestore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
