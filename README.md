@@ -2,11 +2,21 @@
 
 ### Intelligent Healthcare Analytics & Patient Risk Indicator Platform
 
+**🌐 Live Prototype:** https://aegis-health-system007.vercel.app
+
 Aegis Health System is a modern healthcare analytics platform designed to organize patient information, analyze healthcare data, and present transparent risk indicators through an intuitive dashboard.
 
 The system combines **healthcare data management, analytics, visualization, and AI-assisted insights** to help users understand patient and hospital-level information in a structured and accessible way.
 
 > **Note:** Aegis Health System is an educational and analytical platform. Risk indicators are intended for informational purposes and are **not medical diagnoses or clinical decisions**.
+
+---
+
+## 🌐 Live Prototype
+
+The current Aegis Health System prototype is publicly available here:
+
+**👉 https://aegis-health-system007.vercel.app**
 
 ---
 
@@ -62,31 +72,31 @@ The system combines **healthcare data management, analytics, visualization, and 
 ## 🧠 How Aegis Works
 
 ```text
-                    ┌─────────────────────┐
-                    │   Healthcare Data   │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   Data Processing   │
-                    └──────────┬──────────┘
-                               │
-                 ┌─────────────┴─────────────┐
-                 ▼                           ▼
-       ┌──────────────────┐        ┌──────────────────┐
-       │   Analytics      │        │ Risk Indicators  │
-       └────────┬─────────┘        └────────┬─────────┘
-                │                           │
-                └─────────────┬─────────────┘
+                   ┌─────────────────────┐
+                   │   Healthcare Data   │
+                   └──────────┬──────────┘
+                              │
                               ▼
-                    ┌─────────────────────┐
-                    │  Aegis Dashboard    │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ AI-Assisted Insights│
-                    └─────────────────────┘
+                   ┌─────────────────────┐
+                   │   Data Processing   │
+                   └──────────┬──────────┘
+                              │
+               ┌──────────────┴──────────────┐
+               ▼                             ▼
+      ┌──────────────────┐          ┌──────────────────┐
+      │    Analytics     │          │ Risk Indicators  │
+      └────────┬─────────┘          └────────┬─────────┘
+               │                             │
+               └──────────────┬──────────────┘
+                              ▼
+                   ┌─────────────────────┐
+                   │   Aegis Dashboard   │
+                   └──────────┬──────────┘
+                              │
+                              ▼
+                   ┌─────────────────────┐
+                   │ AI-Assisted Insights│
+                   └─────────────────────┘
 ```
 
 ---
@@ -105,15 +115,19 @@ The system combines **healthcare data management, analytics, visualization, and 
 - **Google Gemini API / Google GenAI**
 
 ### Backend & Runtime
-- **Node.js**
-- **Express.js**
-- **dotenv**
+- **Python**
+- **Flask**
+- **MySQL**
+- **Flask-CORS**
+- **mysql-connector-python**
+- **python-dotenv**
 
 ### Development Tools
 - **ESBuild**
 - **TypeScript**
 - **PostCSS**
 - **Autoprefixer**
+- **Git & GitHub**
 
 ---
 
@@ -121,6 +135,12 @@ The system combines **healthcare data management, analytics, visualization, and 
 
 ```text
 Aegis-Health-System/
+│
+├── backend/
+│   ├── app.py
+│   ├── database.py
+│   ├── requirements.txt
+│   └── ...
 │
 ├── src/
 │   ├── components/
@@ -132,7 +152,6 @@ Aegis-Health-System/
 ├── .env.example
 ├── .gitignore
 ├── index.html
-├── metadata.json
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -155,7 +174,7 @@ git clone https://github.com/sathwiksharon2006-sudo/Aegis-Health-System.git
 cd Aegis-Health-System
 ```
 
-### 3. Install dependencies
+### 3. Install frontend dependencies
 
 ```bash
 npm install
@@ -171,21 +190,29 @@ cp .env.example .env
 
 Add the required API configuration to the `.env` file.
 
-> Never commit private API keys or credentials to GitHub.
+> Never commit private API keys, passwords, database credentials, or other secrets to GitHub.
 
-### 5. Start the development server
+### 5. Start the frontend
 
 ```bash
 npm run dev
 ```
 
-The application will be available through the local Vite development server.
+### 6. Start the backend
+
+Navigate to the backend directory and configure the required database environment variables.
+
+```bash
+cd backend
+```
+
+Then start the Flask backend according to the project configuration.
 
 ---
 
 ## 🏗️ Build for Production
 
-To create a production build:
+To create a production frontend build:
 
 ```bash
 npm run build
@@ -195,12 +222,6 @@ To preview the production build:
 
 ```bash
 npm run preview
-```
-
-To check TypeScript:
-
-```bash
-npm run lint
 ```
 
 ---
@@ -297,6 +318,10 @@ Mohan Babu University
 
 GitHub:  
 https://github.com/sathwiksharon2006-sudo
+
+### 🌐 Project Prototype
+
+https://aegis-health-system007.vercel.app
 
 ---
 
