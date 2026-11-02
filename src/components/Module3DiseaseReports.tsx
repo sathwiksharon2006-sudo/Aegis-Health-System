@@ -1,5 +1,6 @@
-
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { DiseaseReport, Doctor } from '../types/hospital';
+import { DISEASE_REPORTS, DOCTORS_ROSTER } from '../data/mockHospitalData';
 import {
   Stethoscope,
   Activity,
@@ -10,898 +11,422 @@ import {
   AlertCircle,
   Building,
   UserCheck,
+  ChevronRight,
   TrendingUp,
+  FileSpreadsheet,
   Search,
-  Users,
-  Database,
-  X,
+  BedDouble,
+  Sparkles,
+  Plus,
+  Minus
 } from 'lucide-react';
 
-interface DiseaseReport {
-  patient_id: number;
-  patient_name: string;
-  disease_id: number;
-  disease_name: string;
-  description: string | null;
-  diagnosed_date: string | null;
-  status: string | null;
-}
-
-interface DoctorRecord {
-  doctor_id: number;
-  doctor_name: string;
-  specialization: string;
-  department_name: string;
-}
-
 interface Module3DiseaseReportsProps {
+  diseaseReports?: DiseaseReport[];
+  doctors?: Doctor[];
   onAssignDoctorToIntake: (doctorName: string, department: string) => void;
-}
-
-type Timeframe = 'daily' | 'weekly' | 'monthly' | 'yearly';
-
-interface DiseaseSummary {
-  diseaseId: number;
-  name: string;
-  description: string;
-  totalCases: number;
-  dailyCount: number;
-  weeklyCount: number;
-  monthlyCount: number;
-  yearlyCount: number;
-  activeCases: number;
-  monitoringCases: number;
-  recoveringCases: number;
-  patients: DiseaseReport[];
+  onUpdateDoctorStatus?: (id: string, status: Doctor['status'], queue?: number) => void;
+  onAddDiseaseCase?: (diseaseId: string) => void;
 }
 
 export const Module3DiseaseReports: React.FC<Module3DiseaseReportsProps> = ({
+  diseaseReports = DISEASE_REPORTS,
+  doctors = DOCTORS_ROSTER,
   onAssignDoctorToIntake,
+  onUpdateDoctorStatus,
+  onAddDiseaseCase,
 }) => {
-  const [diseaseReports, setDiseaseReports] = useState<DiseaseReport[]>([]);
-  const [doctors, setDoctors] = useState<DoctorRecord[]>([]);
-
-  const [loadingDiseases, setLoadingDiseases] = useState(true);
-  const [loadingDoctors, setLoadingDoctors] = useState(true);
-
-  const [diseaseError, setDiseaseError] = useState('');
-  const [doctorError, setDoctorError] = useState('');
-
-  const [diseaseTimeframe, setDiseaseTimeframe] =
-    useState<Timeframe>('weekly');
-
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  // Disease Timeframe state
+  const [diseaseTimeframe, setDiseaseTimeframe] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [diseaseSearch, setDiseaseSearch] = useState('');
 
-  const [doctorDeptFilter, setDoctorDeptFilter] = useState('all');
+  // Doctor roster filters
+  const [doctorDeptFilter, setDoctorDeptFilter] = useState<string>('all');
+  const [doctorStatusFilter, setDoctorStatusFilter] = useState<string>('all');
   const [doctorSearch, setDoctorSearch] = useState('');
 
-  const [selectedDisease, setSelectedDisease] =
-    useState<DiseaseSummary | null>(null);
+  // Selected disease detail modal
+  const [selectedDisease, setSelectedDisease] = useState<DiseaseReport | null>(null);
 
-  useEffect(() => {
-    const loadDiseaseReports = async () => {
-      try {
-        setLoadingDiseases(true);
-        setDiseaseError('');
-
-        const response = await fetch(
-          'http://127.0.0.1:5000/api/disease-reports'
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to load disease reports');
-        }
-
-        const data = await response.json();
-
-        if (data.status !== 'success') {
-          throw new Error(data.message || 'Failed to load disease reports');
-        }
-
-        setDiseaseReports(data.reports || []);
-      } catch (error) {
-        console.error('Disease reports error:', error);
-        setDiseaseError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load disease reports'
-        );
-      } finally {
-        setLoadingDiseases(false);
-      }
-    };
-
-    loadDiseaseReports();
-  }, []);
-
-  useEffect(() => {
-    const loadDoctors = async () => {
-      try {
-        setLoadingDoctors(true);
-        setDoctorError('');
-
-        const response = await fetch(
-          'http://127.0.0.1:5000/api/doctors'
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to load doctors');
-        }
-
-        const data = await response.json();
-
-        if (data.status !== 'success') {
-          throw new Error(data.message || 'Failed to load doctors');
-        }
-
-        setDoctors(data.doctors || []);
-      } catch (error) {
-        console.error('Doctors error:', error);
-        setDoctorError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load doctors'
-        );
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
-
-    loadDoctors();
-  }, []);
-
-  const getDateFromString = (value: string | null) => {
-    if (!value) return null;
-
-    const date = new Date(`${value}T00:00:00`);
-
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-
-    return date;
-  };
-
-  const isWithinDays = (
-    value: string | null,
-    days: number
-  ) => {
-    const date = getDateFromString(value);
-
-    if (!date) return false;
-
-    const now = new Date();
-
-    const difference =
-      now.getTime() - date.getTime();
-
-    return (
-      difference >= 0 &&
-      difference <= days * 24 * 60 * 60 * 1000
-    );
-  };
-
-  const isWithinCurrentMonth = (value: string | null) => {
-    const date = getDateFromString(value);
-
-    if (!date) return false;
-
-    const now = new Date();
-
-    return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth()
-    );
-  };
-
-  const isWithinCurrentYear = (value: string | null) => {
-    const date = getDateFromString(value);
-
-    if (!date) return false;
-
-    const now = new Date();
-
-    return date.getFullYear() === now.getFullYear();
-  };
-
-  const diseaseSummaries = useMemo<DiseaseSummary[]>(() => {
-    const grouped = new Map<number, DiseaseReport[]>();
-
-    diseaseReports.forEach((report) => {
-      const existing = grouped.get(report.disease_id) || [];
-      existing.push(report);
-      grouped.set(report.disease_id, existing);
-    });
-
-    return Array.from(grouped.entries()).map(
-      ([diseaseId, reports]) => {
-        const dailyCount = reports.filter((report) =>
-          isWithinDays(report.diagnosed_date, 1)
-        ).length;
-
-        const weeklyCount = reports.filter((report) =>
-          isWithinDays(report.diagnosed_date, 7)
-        ).length;
-
-        const monthlyCount = reports.filter((report) =>
-          isWithinCurrentMonth(report.diagnosed_date)
-        ).length;
-
-        const yearlyCount = reports.filter((report) =>
-          isWithinCurrentYear(report.diagnosed_date)
-        ).length;
-
-        const activeCases = reports.filter(
-          (report) =>
-            report.status?.toLowerCase() === 'active'
-        ).length;
-
-        const monitoringCases = reports.filter(
-          (report) =>
-            report.status?.toLowerCase() ===
-            'under monitoring'
-        ).length;
-
-        const recoveringCases = reports.filter(
-          (report) =>
-            report.status?.toLowerCase() ===
-            'recovering'
-        ).length;
-
-        return {
-          diseaseId,
-          name: reports[0].disease_name,
-          description: reports[0].description || 'No description available',
-          totalCases: reports.length,
-          dailyCount,
-          weeklyCount,
-          monthlyCount,
-          yearlyCount,
-          activeCases,
-          monitoringCases,
-          recoveringCases,
-          patients: reports,
-        };
-      }
-    );
-  }, [diseaseReports]);
-
-  const categories = useMemo(() => {
-    return [
-      ...new Set(
-        diseaseSummaries.map((disease) => {
-          const name = disease.name.toLowerCase();
-
-          if (
-            name.includes('heart') ||
-            name.includes('hypertension')
-          ) {
-            return 'Cardiovascular';
-          }
-
-          if (
-            name.includes('asthma') ||
-            name.includes('pneumonia')
-          ) {
-            return 'Respiratory';
-          }
-
-          if (
-            name.includes('diabetes') ||
-            name.includes('obesity')
-          ) {
-            return 'Metabolic';
-          }
-
-          if (
-            name.includes('migraine')
-          ) {
-            return 'Neurological';
-          }
-
-          if (
-            name.includes('arthritis')
-          ) {
-            return 'Musculoskeletal';
-          }
-
-          if (
-            name.includes('kidney')
-          ) {
-            return 'Renal';
-          }
-
-          if (
-            name.includes('anemia')
-          ) {
-            return 'Blood';
-          }
-
-          return 'Other';
-        })
-      ),
-    ];
-  }, [diseaseSummaries]);
-
-  const getCategory = (diseaseName: string) => {
-    const name = diseaseName.toLowerCase();
-
-    if (
-      name.includes('heart') ||
-      name.includes('hypertension')
-    ) {
-      return 'Cardiovascular';
-    }
-
-    if (
-      name.includes('asthma') ||
-      name.includes('pneumonia')
-    ) {
-      return 'Respiratory';
-    }
-
-    if (
-      name.includes('diabetes') ||
-      name.includes('obesity')
-    ) {
-      return 'Metabolic';
-    }
-
-    if (name.includes('migraine')) {
-      return 'Neurological';
-    }
-
-    if (name.includes('arthritis')) {
-      return 'Musculoskeletal';
-    }
-
-    if (name.includes('kidney')) {
-      return 'Renal';
-    }
-
-    if (name.includes('anemia')) {
-      return 'Blood';
-    }
-
-    return 'Other';
-  };
-
+  // Filtered diseases
   const filteredDiseases = useMemo(() => {
-    const search = diseaseSearch.toLowerCase();
-
-    return diseaseSummaries.filter((disease) => {
-      const category = getCategory(disease.name);
-
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        category === selectedCategory;
-
+    return diseaseReports.filter((item) => {
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
       const matchesSearch =
-        disease.name.toLowerCase().includes(search) ||
-        disease.description.toLowerCase().includes(search) ||
-        category.toLowerCase().includes(search);
-
+        item.name.toLowerCase().includes(diseaseSearch.toLowerCase()) ||
+        item.icd10.toLowerCase().includes(diseaseSearch.toLowerCase()) ||
+        item.category.toLowerCase().includes(diseaseSearch.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [
-    diseaseSummaries,
-    selectedCategory,
-    diseaseSearch,
-  ]);
+  }, [diseaseReports, selectedCategory, diseaseSearch]);
 
-  const getTimeframeCount = (
-    disease: DiseaseSummary
-  ) => {
-    if (diseaseTimeframe === 'daily') {
-      return disease.dailyCount;
-    }
-
-    if (diseaseTimeframe === 'weekly') {
-      return disease.weeklyCount;
-    }
-
-    if (diseaseTimeframe === 'monthly') {
-      return disease.monthlyCount;
-    }
-
-    return disease.yearlyCount;
-  };
-
+  // Aggregate totals for the active timeframe
   const totalCasesInPeriod = useMemo(() => {
-    return filteredDiseases.reduce(
-      (total, disease) =>
-        total + getTimeframeCount(disease),
-      0
-    );
+    return filteredDiseases.reduce((acc, curr) => {
+      const count =
+        diseaseTimeframe === 'daily'
+          ? curr.dailyCount
+          : diseaseTimeframe === 'weekly'
+          ? curr.weeklyCount
+          : diseaseTimeframe === 'monthly'
+          ? curr.monthlyCount
+          : curr.yearlyCount;
+      return acc + count;
+    }, 0);
   }, [filteredDiseases, diseaseTimeframe]);
-
-  const totalActiveCases = useMemo(() => {
-    return filteredDiseases.reduce(
-      (total, disease) =>
-        total + disease.activeCases,
-      0
-    );
-  }, [filteredDiseases]);
-
-  const totalMonitoringCases = useMemo(() => {
-    return filteredDiseases.reduce(
-      (total, disease) =>
-        total + disease.monitoringCases,
-      0
-    );
-  }, [filteredDiseases]);
-
-  const totalRecoveringCases = useMemo(() => {
-    return filteredDiseases.reduce(
-      (total, disease) =>
-        total + disease.recoveringCases,
-      0
-    );
-  }, [filteredDiseases]);
 
   const maxDiseaseCount = useMemo(() => {
     return Math.max(
-      ...filteredDiseases.map(
-        (disease) => getTimeframeCount(disease)
+      ...filteredDiseases.map((d) =>
+        diseaseTimeframe === 'daily'
+          ? d.dailyCount
+          : diseaseTimeframe === 'weekly'
+          ? d.weeklyCount
+          : diseaseTimeframe === 'monthly'
+          ? d.monthlyCount
+          : d.yearlyCount
       ),
       1
     );
   }, [filteredDiseases, diseaseTimeframe]);
 
-  const departmentList = useMemo(() => {
-    return [
-      ...new Set(
-        doctors.map(
-          (doctor) => doctor.department_name
-        )
-      ),
-    ].sort();
-  }, [doctors]);
-
+  // Filtered Doctors
   const filteredDoctors = useMemo(() => {
-    const search = doctorSearch.toLowerCase();
-
-    return doctors.filter((doctor) => {
-      const matchesDepartment =
-        doctorDeptFilter === 'all' ||
-        doctor.department_name ===
-          doctorDeptFilter;
-
+    return doctors.filter((doc) => {
+      const matchesDept = doctorDeptFilter === 'all' || doc.department === doctorDeptFilter;
+      const matchesStatus = doctorStatusFilter === 'all' || doc.status === doctorStatusFilter;
       const matchesSearch =
-        doctor.doctor_name
-          .toLowerCase()
-          .includes(search) ||
-        doctor.specialization
-          .toLowerCase()
-          .includes(search) ||
-        doctor.department_name
-          .toLowerCase()
-          .includes(search);
-
-      return (
-        matchesDepartment &&
-        matchesSearch
-      );
+        doc.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+        doc.specialty.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+        doc.roomNumber.toLowerCase().includes(doctorSearch.toLowerCase());
+      return matchesDept && matchesStatus && matchesSearch;
     });
-  }, [
-    doctors,
-    doctorDeptFilter,
-    doctorSearch,
-  ]);
+  }, [doctors, doctorDeptFilter, doctorStatusFilter, doctorSearch]);
 
-  const statusCounts = useMemo(() => {
-    const active = diseaseReports.filter(
-      (report) =>
-        report.status?.toLowerCase() === 'active'
-    ).length;
-
-    const monitoring = diseaseReports.filter(
-      (report) =>
-        report.status?.toLowerCase() ===
-        'under monitoring'
-    ).length;
-
-    const recovering = diseaseReports.filter(
-      (report) =>
-        report.status?.toLowerCase() ===
-        'recovering'
-    ).length;
-
-    return {
-      active,
-      monitoring,
-      recovering,
-    };
-  }, [diseaseReports]);
+  // Doctor status breakdown
+  const availableDocsCount = doctors.filter((d) => d.status === 'Available').length;
+  const inConsultCount = doctors.filter((d) => d.status === 'In Consultation').length;
+  const inSurgeryCount = doctors.filter((d) => d.status === 'In Surgery').length;
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* SECTION 1 */}
-      <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div className="space-y-10">
+      {/* Module Title Header */}
+      <div className="pb-4 border-b border-slate-800">
+        <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 uppercase tracking-wider mb-1">
+          <span>Module 03</span>
+          <span aria-hidden="true">·</span>
+          <span>Epidemiological Reports & Clinical Staffing</span>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-400" />
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Disease Incidence Analytics & Doctor Availability
+            </h1>
+            <p className="text-sm text-slate-400 mt-1 max-w-3xl">
+              Multi-cadence disease surveillance reports (yearly, monthly, weekly, daily) synced with live Firestore database, doctor rosters, consultation queues, and specialty ward availability.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Firestore Real-Time Sync</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
-              <h2 className="text-xl font-bold text-white">
-                Disease Reports & Registry
-              </h2>
-            </div>
-
-            <p className="text-xs text-slate-400 mt-1">
-              Disease records and patient associations
-              retrieved from the hospital database.
+      {/* SECTION 1: DISEASE REPORTS */}
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+              <span>Disease Surveillance & Case Breakdown</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Review disease incidence across Daily, Weekly, Monthly, and Yearly operational periods.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-              <Database className="w-3.5 h-3.5" />
-              MySQL via Flask
-            </span>
-
-            <span className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
-              {diseaseReports.length} records
-            </span>
+          {/* Timeframe Switcher Tabs */}
+          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl self-start md:self-auto">
+            <button
+              onClick={() => setDiseaseTimeframe('daily')}
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                diseaseTimeframe === 'daily'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Daily Reports
+            </button>
+            <button
+              onClick={() => setDiseaseTimeframe('weekly')}
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                diseaseTimeframe === 'weekly'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Weekly Reports
+            </button>
+            <button
+              onClick={() => setDiseaseTimeframe('monthly')}
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                diseaseTimeframe === 'monthly'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Monthly Reports
+            </button>
+            <button
+              onClick={() => setDiseaseTimeframe('yearly')}
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                diseaseTimeframe === 'yearly'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Yearly Reports
+            </button>
           </div>
         </div>
 
-        {diseaseError && (
-          <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-rose-300 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{diseaseError}</span>
-          </div>
-        )}
-
-        {/* KPI CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Total Records
+        {/* Disease Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+            <span className="text-xs text-slate-400">Total {diseaseTimeframe.toUpperCase()} Cases</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-white tabular-nums">
+                {totalCasesInPeriod.toLocaleString()}
               </span>
-
-              <Users className="w-4 h-4 text-cyan-400" />
-            </div>
-
-            <div className="text-2xl font-bold text-white mt-2">
-              {diseaseReports.length}
-            </div>
-
-            <div className="text-[11px] text-slate-500 mt-1">
-              Patient-disease associations
+              <span className="text-xs text-slate-400">diagnosed</span>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Active
+          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+            <span className="text-xs text-slate-400">Active Hospital Admissions</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-amber-400 tabular-nums">
+                {filteredDiseases.reduce((a, b) => a + b.activeCases, 0)}
               </span>
-
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            </div>
-
-            <div className="text-2xl font-bold text-emerald-300 mt-2">
-              {statusCounts.active}
-            </div>
-
-            <div className="text-[11px] text-slate-500 mt-1">
-              Status from database
+              <span className="text-xs text-slate-400">under treatment</span>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Monitoring
+          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+            <span className="text-xs text-slate-400">Bed Occupancy by Condition</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-cyan-400 tabular-nums">
+                {filteredDiseases.reduce((a, b) => a + b.bedOccupancy, 0)}
               </span>
-
-              <Clock className="w-4 h-4 text-amber-400" />
-            </div>
-
-            <div className="text-2xl font-bold text-amber-300 mt-2">
-              {statusCounts.monitoring}
-            </div>
-
-            <div className="text-[11px] text-slate-500 mt-1">
-              Under monitoring
+              <span className="text-xs text-slate-400">beds dedicated</span>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Recovering
+          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+            <span className="text-xs text-slate-400">Average Clinical Recovery Rate</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-emerald-400 tabular-nums">
+                {(
+                  filteredDiseases.reduce((a, b) => a + b.recoveryRate, 0) / (filteredDiseases.length || 1)
+                ).toFixed(1)}
+                %
               </span>
-
-              <TrendingUp className="w-4 h-4 text-cyan-400" />
-            </div>
-
-            <div className="text-2xl font-bold text-cyan-300 mt-2">
-              {statusCounts.recovering}
-            </div>
-
-            <div className="text-[11px] text-slate-500 mt-1">
-              Recovering status
+              <span className="text-xs text-slate-400">overall</span>
             </div>
           </div>
         </div>
 
-        {/* TIMEFRAME */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-white">
-                Diagnosed Cases by Timeframe
-              </div>
-
-              <div className="text-[11px] text-slate-500 mt-1">
-                Calculated from diagnosed_date stored
-                in MySQL.
-              </div>
-            </div>
-
-            <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-1">
-              {(
-                [
-                  'daily',
-                  'weekly',
-                  'monthly',
-                  'yearly',
-                ] as Timeframe[]
-              ).map((timeframe) => (
-                <button
-                  key={timeframe}
-                  onClick={() =>
-                    setDiseaseTimeframe(timeframe)
-                  }
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors ${
-                    diseaseTimeframe === timeframe
-                      ? 'bg-emerald-500/20 text-emerald-300'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  {timeframe}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-end justify-between">
-            <div>
-              <div className="text-3xl font-bold text-white">
-                {totalCasesInPeriod}
-              </div>
-
-              <div className="text-xs text-slate-500">
-                Records in selected period
-              </div>
-            </div>
-
-            <Calendar className="w-6 h-6 text-emerald-400" />
-          </div>
-        </div>
-
-        {/* FILTERS */}
-        <div className="flex flex-col lg:flex-row gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
+        {/* Disease Category Filters & Search */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
           <div className="flex-1 relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
             <input
               type="text"
-              placeholder="Search disease or description..."
+              placeholder="Search diseases by name, ICD-10 code, or condition..."
               value={diseaseSearch}
-              onChange={(e) =>
-                setDiseaseSearch(e.target.value)
-              }
-              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              onChange={(e) => setDiseaseSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-500" />
-
             <select
               value={selectedCategory}
-              onChange={(e) =>
-                setSelectedCategory(e.target.value)
-              }
-              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
             >
-              <option value="all">
-                All Categories
-              </option>
-
-              {categories.map((category) => (
-                <option
-                  key={category}
-                  value={category}
-                >
-                  {category}
-                </option>
-              ))}
+              <option value="all">All Disease Categories</option>
+              <option value="Cardiovascular">Cardiovascular</option>
+              <option value="Respiratory">Respiratory</option>
+              <option value="Infectious & Viral">Infectious & Viral</option>
+              <option value="Endocrine & Metabolic">Endocrine & Metabolic</option>
+              <option value="Orthopedic">Orthopedic</option>
+              <option value="Neurological">Neurological</option>
+              <option value="Gastrointestinal">Gastrointestinal</option>
             </select>
           </div>
         </div>
 
-        {/* INCIDENCE */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-sm font-bold text-white">
-                Disease Incidence
-              </h3>
-
-              <p className="text-[11px] text-slate-500 mt-1">
-                Based on real diagnosis records.
-              </p>
-            </div>
-
-            <span className="text-[11px] text-slate-500">
-              {filteredDiseases.length} diseases
+        {/* Disease Visual Incidence Bar Chart */}
+        <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+          <h3 className="text-sm font-bold text-white mb-4 flex items-center justify-between">
+            <span>
+              Comparative Disease Incidence ({diseaseTimeframe.toUpperCase()} Cadence)
             </span>
-          </div>
+            <span className="text-xs font-mono text-slate-400 font-normal">
+              Showing {filteredDiseases.length} condition categories
+            </span>
+          </h3>
 
-          {loadingDiseases ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              Loading disease records...
-            </div>
-          ) : filteredDiseases.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              No disease records match your filters.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredDiseases.map((disease) => {
-                const count =
-                  getTimeframeCount(disease);
+          <div className="space-y-3">
+            {filteredDiseases.map((disease) => {
+              const currentCount =
+                diseaseTimeframe === 'daily'
+                  ? disease.dailyCount
+                  : diseaseTimeframe === 'weekly'
+                  ? disease.weeklyCount
+                  : diseaseTimeframe === 'monthly'
+                  ? disease.monthlyCount
+                  : disease.yearlyCount;
 
-                const percent =
-                  maxDiseaseCount > 0
-                    ? (count / maxDiseaseCount) * 100
-                    : 0;
+              const percent = Math.round((currentCount / maxDiseaseCount) * 100);
 
-                return (
-                  <div key={disease.diseaseId}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-200">
-                          {disease.name}
-                        </span>
-
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500">
-                          {getCategory(disease.name)}
-                        </span>
-                      </div>
-
-                      <span className="text-xs font-mono text-emerald-300">
-                        {count}
+              return (
+                <div
+                  key={disease.id}
+                  onClick={() => setSelectedDisease(disease)}
+                  className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl hover:border-slate-700 hover:bg-slate-800/30 transition-all cursor-pointer group"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white group-hover:text-emerald-300 transition-colors">
+                        {disease.name}
                       </span>
+                      <span className="font-mono text-xs text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
+                        {disease.icd10}
+                      </span>
+                      <span className="text-[11px] text-slate-400">· {disease.category}</span>
                     </div>
 
-                    <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-400 transition-all duration-500"
-                        style={{
-                          width: `${percent}%`,
-                        }}
-                      />
+                    <div className="flex items-center gap-3 font-mono">
+                      <span className="text-emerald-400 font-bold tabular-nums">
+                        {currentCount.toLocaleString()} {diseaseTimeframe} cases
+                      </span>
+                      <span className="text-slate-400 text-[11px]">
+                        Recovery: <strong className="text-white">{disease.recoveryRate}%</strong>
+                      </span>
+                      {onAddDiseaseCase && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAddDiseaseCase(disease.id);
+                          }}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 rounded text-[11px] border border-slate-700 flex items-center gap-1"
+                          title="Record new admission case to Firestore in real-time"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Case</span>
+                        </button>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+
+                  {/* Visual Bar */}
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        disease.severity === 'Critical'
+                          ? 'bg-rose-500'
+                          : disease.severity === 'Severe'
+                          ? 'bg-amber-400'
+                          : 'bg-emerald-400'
+                      }`}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* REGISTRY TABLE */}
+        {/* Detailed Disease Registry Table */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-slate-800">
-            <h3 className="text-sm font-bold text-white">
-              Detailed Disease Registry
-            </h3>
-
-            <p className="text-[11px] text-slate-500 mt-1">
-              Values below are derived only from fields
-              available in the MySQL schema.
-            </p>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
-                  <th className="py-3 px-4">
-                    Disease
-                  </th>
-
-                  <th className="py-3 px-4">
-                    Category
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Daily
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Weekly
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Monthly
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Yearly
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Total
-                  </th>
-
-                  <th className="py-3 px-4 text-right">
-                    Active
-                  </th>
-
-                  <th className="py-3 px-4">
-                    Data Status
-                  </th>
+                  <th className="py-3 px-4">Disease / ICD-10</th>
+                  <th className="py-3 px-4">Category & Severity</th>
+                  <th className="py-3 px-4 text-right">Daily</th>
+                  <th className="py-3 px-4 text-right">Weekly</th>
+                  <th className="py-3 px-4 text-right">Monthly</th>
+                  <th className="py-3 px-4 text-right">Yearly</th>
+                  <th className="py-3 px-4 text-right">Active / Beds</th>
+                  <th className="py-3 px-4 text-right">Recovery Rate</th>
+                  <th className="py-3 px-4">Lead Ward</th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-slate-800/70 font-mono text-xs">
-                {filteredDiseases.map((disease) => (
+                {filteredDiseases.map((d) => (
                   <tr
-                    key={disease.diseaseId}
-                    onClick={() =>
-                      setSelectedDisease(disease)
-                    }
+                    key={d.id}
+                    onClick={() => setSelectedDisease(d)}
                     className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
                   >
                     <td className="py-3 px-4 font-sans">
                       <div className="font-semibold text-white group-hover:text-emerald-300 transition-colors">
-                        {disease.name}
+                        {d.name}
                       </div>
-
-                      <div className="text-[11px] text-slate-500 max-w-xs">
-                        {disease.description}
-                      </div>
+                      <div className="text-[11px] font-mono text-emerald-400">{d.icd10}</div>
                     </td>
 
-                    <td className="py-3 px-4 font-sans text-slate-300">
-                      {getCategory(disease.name)}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-slate-200">
-                      {disease.dailyCount}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-emerald-300 font-bold">
-                      {disease.weeklyCount}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-slate-300">
-                      {disease.monthlyCount}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-cyan-300 font-semibold">
-                      {disease.yearlyCount}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-white font-bold">
-                      {disease.totalCases}
-                    </td>
-
-                    <td className="py-3 px-4 text-right text-emerald-300">
-                      {disease.activeCases}
-                    </td>
-
-                    <td className="py-3 px-4">
-                      <span className="text-[10px] text-slate-500">
-                        Available
+                    <td className="py-3 px-4 font-sans whitespace-nowrap">
+                      <div className="text-slate-300">{d.category}</div>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded inline-block mt-0.5 ${
+                          d.severity === 'Critical'
+                            ? 'bg-rose-500/20 text-rose-300'
+                            : d.severity === 'Severe'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                        }`}
+                      >
+                        {d.severity}
                       </span>
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-slate-200">
+                      {d.dailyCount}
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-slate-200 font-bold">
+                      {d.weeklyCount}
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-slate-300">
+                      {d.monthlyCount}
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-cyan-300 font-semibold">
+                      {d.yearlyCount.toLocaleString()}
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-amber-300">
+                      {d.activeCases} ({d.bedOccupancy} beds)
+                    </td>
+
+                    <td className="py-3 px-4 text-right tabular-nums text-emerald-400 font-bold">
+                      {d.recoveryRate}%
+                    </td>
+
+                    <td className="py-3 px-4 font-sans text-slate-400 whitespace-nowrap">
+                      {d.primaryDepartment}
                     </td>
                   </tr>
                 ))}
@@ -909,325 +434,316 @@ export const Module3DiseaseReports: React.FC<Module3DiseaseReportsProps> = ({
             </table>
           </div>
         </div>
-
-        {/* DATA LIMITATIONS */}
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
-          <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-
-            <div>
-              <h4 className="text-sm font-semibold text-amber-300">
-                Database Coverage
-              </h4>
-
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                The current database contains disease
-                names, descriptions, diagnosis dates,
-                patient associations, and status values.
-                ICD-10 codes, clinical severity, recovery
-                percentages, and bed occupancy are not
-                currently stored, so this dashboard does
-                not fabricate those values.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* SECTION 2 */}
+      {/* SECTION 2: DOCTOR AVAILABILITY IN THE HOSPITAL */}
       <div className="pt-8 border-t border-slate-800 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <Stethoscope className="w-5 h-5 text-emerald-400" />
-
-              <span>
-                Hospital Doctors & Departments
-              </span>
+              <span>Real-Time Doctor Availability & Shift Roster</span>
             </h2>
-
             <p className="text-xs text-slate-400 mt-0.5">
-              Doctor identities and department assignments
-              retrieved from MySQL.
+              Live status, consultation room assignments, current queue lengths, and direct consult booking connected to Firestore.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
+          {/* Quick Roster Status Indicators */}
+          <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-              <UserCheck className="w-3.5 h-3.5" />
-
-              <span>
-                {doctors.length} Doctors
-              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>{availableDocsCount} Available</span>
             </span>
-
-            <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800">
-              {departmentList.length} Departments
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span>{inConsultCount} In Consult</span>
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>{inSurgeryCount} In Surgery</span>
             </span>
           </div>
         </div>
 
-        {doctorError && (
-          <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-rose-300 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-
-            <span>{doctorError}</span>
-          </div>
-        )}
-
-        {/* DOCTOR FILTERS */}
+        {/* Doctor Filters Toolbar */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
           <div className="flex-1 relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
             <input
               type="text"
-              placeholder="Search doctor, specialty, or department..."
+              placeholder="Search doctor by name, specialty, room number..."
               value={doctorSearch}
-              onChange={(e) =>
-                setDoctorSearch(e.target.value)
-              }
+              onChange={(e) => setDoctorSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
-          <select
-            value={doctorDeptFilter}
-            onChange={(e) =>
-              setDoctorDeptFilter(e.target.value)
-            }
-            className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
-          >
-            <option value="all">
-              All Departments
-            </option>
+          <div className="flex items-center gap-2">
+            <select
+              value={doctorDeptFilter}
+              onChange={(e) => setDoctorDeptFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="all">All Departments</option>
+              <option value="Cardiology">Cardiology</option>
+              <option value="Pulmonology">Pulmonology</option>
+              <option value="Neurology">Neurology</option>
+              <option value="Nephrology">Nephrology</option>
+              <option value="Orthopedics">Orthopedics</option>
+              <option value="Gastroenterology">Gastroenterology</option>
+              <option value="Emergency Medicine">Emergency Medicine</option>
+              <option value="General Medicine">General Medicine</option>
+              <option value="Pediatrics">Pediatrics</option>
+              <option value="Oncology">Oncology</option>
+            </select>
 
-            {departmentList.map((department) => (
-              <option
-                key={department}
-                value={department}
-              >
-                {department}
-              </option>
-            ))}
-          </select>
+            <select
+              value={doctorStatusFilter}
+              onChange={(e) => setDoctorStatusFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Available">Available Now</option>
+              <option value="In Consultation">In Consultation</option>
+              <option value="In Surgery">In Surgery</option>
+              <option value="On Break">On Break</option>
+              <option value="Off Duty">Off Duty</option>
+            </select>
+          </div>
         </div>
 
-        {/* DOCTOR CARDS */}
-        {loadingDoctors ? (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-10 text-center text-sm text-slate-500">
-            Loading doctors...
-          </div>
-        ) : filteredDoctors.length === 0 ? (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-10 text-center text-sm text-slate-500">
-            No doctors match your filters.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredDoctors.map((doctor) => (
+        {/* Doctor Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredDoctors.map((doc) => {
+            const isAvailable = doc.status === 'Available';
+            const isInSurgery = doc.status === 'In Surgery';
+            const isInConsult = doc.status === 'In Consultation';
+
+            return (
               <div
-                key={doctor.doctor_id}
+                key={doc.id}
                 className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-all flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2 mb-4">
+                  <div className="flex items-start justify-between gap-2 mb-3">
                     <div>
-                      <h3 className="text-base font-bold text-white">
-                        {doctor.doctor_name}
-                      </h3>
-
-                      <p className="text-xs text-emerald-400 font-medium">
-                        Doctor
-                      </p>
+                      <h3 className="text-base font-bold text-white">{doc.name}</h3>
+                      <p className="text-xs text-emerald-400 font-medium">{doc.title}</p>
                     </div>
 
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
-                      Database
-                    </span>
+                    {/* Status with quick interactive dropdown to update Firestore in real time */}
+                    {onUpdateDoctorStatus ? (
+                      <select
+                        value={doc.status}
+                        onChange={(e) =>
+                          onUpdateDoctorStatus(doc.id, e.target.value as Doctor['status'], doc.currentQueue)
+                        }
+                        className={`text-[11px] font-bold px-2 py-1 rounded-md shrink-0 cursor-pointer border focus:outline-none ${
+                          isAvailable
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : isInSurgery
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            : isInConsult
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                        title="Change doctor status in Firestore in real-time"
+                      >
+                        <option value="Available" className="bg-slate-900 text-emerald-300">Available</option>
+                        <option value="In Consultation" className="bg-slate-900 text-cyan-300">In Consultation</option>
+                        <option value="In Surgery" className="bg-slate-900 text-rose-300">In Surgery</option>
+                        <option value="On Break" className="bg-slate-900 text-amber-300">On Break</option>
+                        <option value="Off Duty" className="bg-slate-900 text-slate-400">Off Duty</option>
+                      </select>
+                    ) : (
+                      <span
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-md shrink-0 ${
+                          isAvailable
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : isInSurgery
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : isInConsult
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
+                        {doc.status}
+                      </span>
+                    )}
                   </div>
 
-                  <p className="text-xs text-slate-300 mb-4">
-                    {doctor.specialization}
-                  </p>
+                  <p className="text-xs text-slate-300 mb-4">{doc.specialty}</p>
 
                   <div className="space-y-2 text-xs text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Building className="w-3.5 h-3.5 text-slate-500" />
-                        Department
+                        <span>Room / Wing:</span>
                       </span>
-
-                      <span className="text-slate-200 text-right">
-                        {doctor.department_name}
-                      </span>
+                      <strong className="text-slate-200">{doc.roomNumber}</strong>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Database className="w-3.5 h-3.5 text-slate-500" />
-                        Doctor ID
+                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Shift Hours:</span>
                       </span>
+                      <span className="text-slate-300 font-mono">{doc.shiftHours}</span>
+                    </div>
 
-                      <span className="text-slate-300 font-mono">
-                        {doctor.doctor_id}
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Current Waiting Queue:</span>
                       </span>
+                      <div className="flex items-center gap-2">
+                        {onUpdateDoctorStatus && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDoctorStatus(doc.id, doc.status, Math.max(0, doc.currentQueue - 1))
+                              }
+                              className="w-4 h-4 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+                              title="Decrease queue count in Firestore"
+                            >
+                              -
+                            </button>
+                            <span className="font-mono font-bold text-amber-300 tabular-nums px-1">
+                              {doc.currentQueue}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDoctorStatus(doc.id, doc.status, doc.currentQueue + 1)
+                              }
+                              className="w-4 h-4 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+                              title="Increase queue count in Firestore"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                        {!onUpdateDoctorStatus && (
+                          <span className="font-mono font-bold text-amber-300 tabular-nums">
+                            {doc.currentQueue}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-400">(~{doc.avgWaitMins}m wait)</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span>Internal Contact:</span>
+                      <span className="font-mono text-slate-300">{doc.contactExtension}</span>
                     </div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() =>
-                    onAssignDoctorToIntake(
-                      doctor.doctor_name,
-                      doctor.department_name
-                    )
-                  }
-                  className="mt-4 w-full px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 transition-colors text-xs font-semibold"
-                >
-                  Assign Doctor
-                </button>
+                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-slate-400">
+                    Dept: <span className="text-slate-300">{doc.department}</span>
+                  </div>
+
+                  <button
+                    onClick={() => onAssignDoctorToIntake(doc.name, doc.department)}
+                    disabled={doc.status === 'Off Duty'}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                      doc.status === 'Off Duty'
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 cursor-pointer'
+                    }`}
+                  >
+                    <span>Assign Patient</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-          <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-cyan-400 shrink-0" />
-
-            <div>
-              <h4 className="text-sm font-semibold text-cyan-300">
-                Doctor Availability
-              </h4>
-
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                The current doctors table stores doctor
-                identity, specialization, and department.
-                It does not contain live availability,
-                consultation status, room assignment, shift,
-                or queue length. Those values are therefore
-                not displayed as if they were real-time data.
-              </p>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* DISEASE DETAIL MODAL */}
+      {/* Disease Detail Modal */}
       {selectedDisease && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setSelectedDisease(null)}
-        >
-          <div
-            className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div className="flex items-start justify-between p-5 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl p-6 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3 mb-4">
               <div>
-                <h3 className="text-lg font-bold text-white">
-                  {selectedDisease.name}
-                </h3>
-
-                <p className="text-xs text-slate-400 mt-1">
-                  {selectedDisease.description}
-                </p>
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                  {selectedDisease.icd10}
+                </span>
+                <h3 className="text-lg font-bold text-white mt-1.5">{selectedDisease.name}</h3>
+                <p className="text-xs text-slate-400">{selectedDisease.category} · Severity: {selectedDisease.severity}</p>
               </div>
-
               <button
-                onClick={() =>
-                  setSelectedDisease(null)
-                }
-                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                onClick={() => setSelectedDisease(null)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <div className="text-[11px] text-slate-500">
-                    Total
+            <div className="space-y-4 text-xs">
+              <div>
+                <h4 className="font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Multi-Cadence Frequency Breakdown
+                </h4>
+                <div className="grid grid-cols-4 gap-2 p-3 bg-slate-950 rounded-xl text-center font-mono">
+                  <div className="border-r border-slate-800">
+                    <span className="text-[10px] text-slate-500 block">Daily</span>
+                    <span className="text-white font-bold text-sm">{selectedDisease.dailyCount}</span>
                   </div>
-
-                  <div className="text-xl font-bold text-white mt-1">
-                    {selectedDisease.totalCases}
+                  <div className="border-r border-slate-800">
+                    <span className="text-[10px] text-slate-500 block">Weekly</span>
+                    <span className="text-white font-bold text-sm">{selectedDisease.weeklyCount}</span>
                   </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <div className="text-[11px] text-slate-500">
-                    Active
+                  <div className="border-r border-slate-800">
+                    <span className="text-[10px] text-slate-500 block">Monthly</span>
+                    <span className="text-white font-bold text-sm">{selectedDisease.monthlyCount}</span>
                   </div>
-
-                  <div className="text-xl font-bold text-emerald-300 mt-1">
-                    {selectedDisease.activeCases}
-                  </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <div className="text-[11px] text-slate-500">
-                    Monitoring
-                  </div>
-
-                  <div className="text-xl font-bold text-amber-300 mt-1">
-                    {selectedDisease.monitoringCases}
-                  </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <div className="text-[11px] text-slate-500">
-                    Recovering
-                  </div>
-
-                  <div className="text-xl font-bold text-cyan-300 mt-1">
-                    {selectedDisease.recoveringCases}
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">Yearly</span>
+                    <span className="text-cyan-400 font-bold text-sm">{selectedDisease.yearlyCount.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">
-                  Patients with this condition
-                </h4>
-
-                <div className="space-y-2">
-                  {selectedDisease.patients.map(
-                    (patient) => (
-                      <div
-                        key={`${patient.patient_id}-${patient.disease_id}`}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-slate-900 border border-slate-800 rounded-xl p-3"
-                      >
-                        <div>
-                          <div className="text-sm font-semibold text-slate-200">
-                            {patient.patient_name}
-                          </div>
-
-                          <div className="text-[11px] text-slate-500">
-                            Patient ID: {patient.patient_id}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-[11px] text-slate-500">
-                            Diagnosed:{' '}
-                            {patient.diagnosed_date ||
-                              'Not recorded'}
-                          </span>
-
-                          <span className="text-[10px] px-2 py-1 rounded-md bg-slate-800 text-slate-300">
-                            {patient.status ||
-                              'Not recorded'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  )}
+                <h4 className="font-bold text-slate-300 uppercase tracking-wider mb-1.5">Primary Symptoms</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedDisease.primarySymptoms.map((symp) => (
+                    <span key={symp} className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded-lg text-xs">
+                      {symp}
+                    </span>
+                  ))}
                 </div>
               </div>
+
+              <div className="p-3 bg-slate-950 rounded-xl space-y-1 text-slate-300">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Recovery Rate:</span>
+                  <span className="font-bold text-emerald-400 font-mono">{selectedDisease.recoveryRate}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Dedicated Bed Occupancy:</span>
+                  <span className="font-bold text-amber-300 font-mono">{selectedDisease.bedOccupancy} beds</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Primary Ward:</span>
+                  <span className="font-bold text-white">{selectedDisease.primaryDepartment}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setSelectedDisease(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Close Report
+              </button>
             </div>
           </div>
         </div>

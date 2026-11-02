@@ -6,94 +6,170 @@ import { Module3DiseaseReports } from './components/Module3DiseaseReports';
 import { Module4HologramRisk } from './components/Module4HologramRisk';
 import { AuthModal } from './components/AuthModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { INITIAL_PATIENTS } from './data/mockHospitalData';
-import { getPatients } from './api';
-import { Patient, VisitRecord } from './types/hospital';
 import {
+  INITIAL_PATIENTS,
+  DOCTORS_ROSTER,
+  DISEASE_REPORTS,
+  ANATOMICAL_RISK_PARTS,
+  VISIT_OVERVIEW_METRICS,
+} from './data/mockHospitalData';
+import { Patient, VisitRecord, Doctor, DiseaseReport, AnatomicalRiskPart } from './types/hospital';
+import {
+  db,
   savePatientToFirestore,
+  updateDoctorStatusInFirestore,
+  updateDiseaseStatsInFirestore,
+  updateAnatomicalRiskInFirestore,
+  saveOverviewMetricsToFirestore,
+  seedInitialPatientsIfEmpty,
+  seedInitialDoctorsIfEmpty,
+  seedInitialDiseaseReportsIfEmpty,
+  seedInitialAnatomicalRisksIfEmpty,
+  seedInitialOverviewMetricsIfEmpty,
+  seedAllHospitalCollections,
+  handleFirestoreError,
+  OperationType,
 } from './lib/firebase';
-import { LogIn } from 'lucide-react';
+import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { Database, LogIn, RefreshCw, CheckCircle2, Cloud } from 'lucide-react';
 
 function HospitalDashboard() {
   const { user, userProfile, setIsAuthModalOpen, setAuthModalMode } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'diseases' | 'hologram'>('overview');
 
-  // Patients Database state
+  // Real-Time State Collections backed by Firestore
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem('aegis_hospital_patients_db');
-
       if (saved) {
         const parsed = JSON.parse(saved);
-
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (e) {
-      console.error('Error loading patients from storage', e);
-    }
-
+    } catch (e) {}
     return INITIAL_PATIENTS;
   });
 
-  const [dbSyncStatus, setDbSyncStatus] = useState<'cloud-synced' | 'local-cached'>('local-cached');
+  const [doctors, setDoctors] = useState<Doctor[]>(DOCTORS_ROSTER);
+  const [diseaseReports, setDiseaseReports] = useState<DiseaseReport[]>(DISEASE_REPORTS);
+  const [riskParts, setRiskParts] = useState<AnatomicalRiskPart[]>(ANATOMICAL_RISK_PARTS);
+  const [overviewMetrics, setOverviewMetrics] = useState(VISIT_OVERVIEW_METRICS);
+  const [dbSyncStatus, setDbSyncStatus] = useState<'cloud-live' | 'syncing' | 'offline'>('syncing');
 
-  // Load patient records from MySQL through Flask
+  // 1. Real-time Listeners for Public/Hospital Collections (Doctors, Disease Reports, Hologram Risks, Overview)
   useEffect(() => {
-    const loadPatientsFromMySQL = async () => {
-      try {
-        const data = await getPatients();
-
-        if (data.status === 'success') {
-          setPatients(data.patients);
-          setDbSyncStatus('cloud-synced');
-
-          localStorage.setItem(
-            'aegis_hospital_patients_db',
-            JSON.stringify(data.patients)
-          );
+    // Doctors Listener
+    const unsubDoctors = onSnapshot(
+      collection(db, 'doctors'),
+      async (snap) => {
+        if (!snap.empty) {
+          const docs: Doctor[] = [];
+          snap.forEach((d) => docs.push(d.data() as Doctor));
+          setDoctors(docs);
+        } else if (user) {
+          await seedInitialDoctorsIfEmpty(0);
         }
-      } catch (error) {
-        console.error('Error loading patients from MySQL:', error);
-      }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'doctors')
+    );
+
+    // Disease Reports Listener
+    const unsubDiseases = onSnapshot(
+      collection(db, 'disease_reports'),
+      async (snap) => {
+        if (!snap.empty) {
+          const reports: DiseaseReport[] = [];
+          snap.forEach((d) => reports.push(d.data() as DiseaseReport));
+          setDiseaseReports(reports);
+        } else if (user) {
+          await seedInitialDiseaseReportsIfEmpty(0);
+        }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'disease_reports')
+    );
+
+    // Anatomical Risks Listener (Hologram Visualizer)
+    const unsubRisks = onSnapshot(
+      collection(db, 'anatomical_risks'),
+      async (snap) => {
+        if (!snap.empty) {
+          const parts: AnatomicalRiskPart[] = [];
+          snap.forEach((d) => parts.push(d.data() as AnatomicalRiskPart));
+          setRiskParts(parts);
+        } else if (user) {
+          await seedInitialAnatomicalRisksIfEmpty(0);
+        }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'anatomical_risks')
+    );
+
+    // Overview Metrics Listener
+    const unsubOverview = onSnapshot(
+      doc(db, 'overview_metrics', 'hospital_telemetry_live'),
+      async (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.yearly && data?.weekly && data?.daily) {
+            setOverviewMetrics(data as any);
+          }
+        } else if (user) {
+          await seedInitialOverviewMetricsIfEmpty(false);
+        }
+      },
+      (err) => handleFirestoreError(err, OperationType.GET, 'overview_metrics/hospital_telemetry_live')
+    );
+
+    return () => {
+      unsubDoctors();
+      unsubDiseases();
+      unsubRisks();
+      unsubOverview();
     };
-
-    loadPatientsFromMySQL();
-  }, []);
-
-  // Firebase is still used for authentication.
-  // Patient records are loaded from MySQL instead of Firestore.
-  useEffect(() => {
-    if (user) {
-      setDbSyncStatus('cloud-synced');
-    }
   }, [user]);
 
-  // Cache patient data in localStorage
+  // 2. Real-time Listener for Patients (protected healthcare records)
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        'aegis_hospital_patients_db',
-        JSON.stringify(patients)
-      );
-    } catch (e) {
-      console.error('Error saving patients to storage', e);
+    if (!user) {
+      setDbSyncStatus('offline');
+      return;
     }
-  }, [patients]);
+
+    setDbSyncStatus('syncing');
+
+    const unsubPatients = onSnapshot(
+      collection(db, 'patients'),
+      async (snapshot) => {
+        if (!snapshot.empty) {
+          const cloudPatients: Patient[] = [];
+          snapshot.forEach((docSnap) => {
+            cloudPatients.push(docSnap.data() as Patient);
+          });
+          cloudPatients.sort((a, b) => b.visitCount - a.visitCount);
+          setPatients(cloudPatients);
+          localStorage.setItem('aegis_hospital_patients_db', JSON.stringify(cloudPatients));
+          setDbSyncStatus('cloud-live');
+        } else {
+          // Empty collection: seed initial 5 patients
+          await seedInitialPatientsIfEmpty(0);
+          setDbSyncStatus('cloud-live');
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'patients');
+      }
+    );
+
+    return () => unsubPatients();
+  }, [user]);
 
   // Intake Modal open state
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState<boolean>(false);
+  const [selectedPatientIdForDossier, setSelectedPatientIdForDossier] = useState<string | null>(null);
 
-  const [selectedPatientIdForDossier, setSelectedPatientIdForDossier] =
-    useState<string | null>(null);
-
-  // Add new patient
+  // Add new patient (First-time visit)
   const handleSavePatient = async (newPatient: Patient) => {
     setPatients((prev) => [newPatient, ...prev]);
 
-    // Persist to Firestore if a user is logged in.
-    // Existing Firebase functionality is preserved.
+    // Persist to Cloud Firestore if connected
     if (user) {
       try {
         await savePatientToFirestore(newPatient);
@@ -103,11 +179,8 @@ function HospitalDashboard() {
     }
   };
 
-  // Record subsequent visit
-  const handleRecordSubsequentVisit = async (
-    patientId: string,
-    newVisit: VisitRecord
-  ) => {
+  // Record subsequent visit (Returning visit #2+)
+  const handleRecordSubsequentVisit = async (patientId: string, newVisit: VisitRecord) => {
     let updatedPatient: Patient | null = null;
 
     setPatients((prev) =>
@@ -118,15 +191,12 @@ function HospitalDashboard() {
             visitCount: patient.visitCount + 1,
             visits: [...patient.visits, newVisit],
           };
-
           return updatedPatient;
         }
-
         return patient;
       })
     );
 
-    // Existing Firestore functionality is preserved for now.
     if (user && updatedPatient) {
       try {
         await savePatientToFirestore(updatedPatient);
@@ -136,10 +206,70 @@ function HospitalDashboard() {
     }
   };
 
-  const handleAssignDoctorToIntake = (
-    _doctorName: string,
-    _department: string
+  // Live doctor status update
+  const handleUpdateDoctorStatus = async (
+    doctorId: string,
+    status: Doctor['status'],
+    queue?: number
   ) => {
+    setDoctors((prev) =>
+      prev.map((d) => (d.id === doctorId ? { ...d, status, currentQueue: queue ?? d.currentQueue } : d))
+    );
+    if (user) {
+      try {
+        await updateDoctorStatusInFirestore(doctorId, status, queue);
+      } catch (e) {
+        console.error('Failed to update doctor in Firestore', e);
+      }
+    }
+  };
+
+  // Live disease case increment
+  const handleAddDiseaseCase = async (diseaseId: string) => {
+    setDiseaseReports((prev) =>
+      prev.map((d) => {
+        if (d.id === diseaseId) {
+          return {
+            ...d,
+            dailyCount: d.dailyCount + 1,
+            weeklyCount: d.weeklyCount + 1,
+            monthlyCount: d.monthlyCount + 1,
+            yearlyCount: d.yearlyCount + 1,
+            activeCases: d.activeCases + 1,
+          };
+        }
+        return d;
+      })
+    );
+    const target = diseaseReports.find((d) => d.id === diseaseId);
+    if (user && target) {
+      try {
+        await updateDiseaseStatsInFirestore(diseaseId, {
+          dailyCount: target.dailyCount + 1,
+          weeklyCount: target.weeklyCount + 1,
+          monthlyCount: target.monthlyCount + 1,
+          yearlyCount: target.yearlyCount + 1,
+          activeCases: target.activeCases + 1,
+        });
+      } catch (e) {
+        console.error('Failed to update disease case in Firestore', e);
+      }
+    }
+  };
+
+  // Live organ risk adjustment
+  const handleUpdateRiskPart = async (riskId: string, updates: Partial<AnatomicalRiskPart>) => {
+    setRiskParts((prev) => prev.map((p) => (p.id === riskId ? { ...p, ...updates } : p)));
+    if (user) {
+      try {
+        await updateAnatomicalRiskInFirestore(riskId, updates);
+      } catch (e) {
+        console.error('Failed to update anatomical risk in Firestore', e);
+      }
+    }
+  };
+
+  const handleAssignDoctorToIntake = (_doctorName: string, _department: string) => {
     setActiveTab('patients');
     setIsIntakeModalOpen(true);
   };
@@ -151,7 +281,6 @@ function HospitalDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
-
       {/* Top Bar Header */}
       <Header
         activeTab={activeTab}
@@ -162,64 +291,62 @@ function HospitalDashboard() {
         }}
       />
 
-      {/* Database Connection Banner */}
+      {/* Real-Time Database Connection Banner */}
       <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 sm:px-6 lg:px-8 py-2">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs gap-2">
-
           <div className="flex items-center gap-2">
-
             <span
               className={`w-2 h-2 rounded-full ${
-                dbSyncStatus === 'cloud-synced'
+                dbSyncStatus === 'cloud-live'
                   ? 'bg-emerald-400 animate-pulse'
+                  : dbSyncStatus === 'syncing'
+                  ? 'bg-amber-400 animate-pulse'
                   : 'bg-cyan-400'
               }`}
             />
-
             {user ? (
               <span className="text-slate-300">
-                Connected to{' '}
-                <strong className="text-white">
-                  MySQL Database
-                </strong>{' '}
-                · Logged in as{' '}
-                <strong className="text-emerald-400">
-                  {userProfile?.displayName || user.email}
-                </strong>{' '}
-                (
-                {userProfile?.role || 'Staff'})
+                Firestore Cloud Database: <strong className="text-emerald-400">Live Real-Time Connected</strong> (All 4 Modules Synced) · Operator:{' '}
+                <strong className="text-white">{userProfile?.displayName || user.email}</strong> [
+                {userProfile?.role || 'Staff'}]
               </span>
             ) : (
               <span className="text-slate-400">
-                Connected to{' '}
-                <strong className="text-slate-200">
-                  MySQL Database
-                </strong>{' '}
-                · Patient records loaded through Flask API
+                Hospital Cloud Database: <strong className="text-slate-300">Public Live Feeds Active</strong> · Sign in to enable instant real-time mutations and EHR writes.
               </span>
             )}
-
           </div>
 
-          {!user && (
-            <button
-              onClick={() => {
-                setAuthModalMode('login');
-                setIsAuthModalOpen(true);
-              }}
-              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Connect Staff Account</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {user && (
+              <button
+                onClick={() => seedAllHospitalCollections()}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                title="Reseed all database collections with baseline datasets"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Reseed Cloud Data</span>
+              </button>
+            )}
 
+            {!user && (
+              <button
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setIsAuthModalOpen(true);
+                }}
+                className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Connect Staff Account</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
         {activeTab === 'overview' && (
           <Module1Overview
             onNavigateToPatients={() => setActiveTab('patients')}
@@ -240,17 +367,22 @@ function HospitalDashboard() {
 
         {activeTab === 'diseases' && (
           <Module3DiseaseReports
+            diseaseReports={diseaseReports}
+            doctors={doctors}
             onAssignDoctorToIntake={handleAssignDoctorToIntake}
+            onUpdateDoctorStatus={handleUpdateDoctorStatus}
+            onAddDiseaseCase={handleAddDiseaseCase}
           />
         )}
 
         {activeTab === 'hologram' && (
           <Module4HologramRisk
             patients={patients}
+            riskParts={riskParts}
             onSelectPatient={handleSelectPatientFromHologram}
+            onUpdateRiskPart={handleUpdateRiskPart}
           />
         )}
-
       </main>
 
       {/* Auth Modal */}
@@ -259,42 +391,21 @@ function HospitalDashboard() {
       {/* Clinical Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">
-              Aegis Medical Center & Health Network
-            </span>
-
+            <span className="font-semibold text-slate-400">Aegis Medical Center & Health Network</span>
             <span>·</span>
-
-            <span>
-              Hospital Telemetry & Diagnostic Suite
-            </span>
+            <span>Hospital Telemetry & Diagnostic Suite</span>
           </div>
 
           <div className="flex items-center gap-4 text-slate-400 font-mono text-[11px]">
-
-            <span>
-              Database: MySQL via Flask
-            </span>
-
+            <span>Database: Firestore Live Sync</span>
             <span>·</span>
-
-            <span>
-              HIPAA Compliant EHR
-            </span>
-
+            <span>HIPAA Compliant EHR</span>
             <span>·</span>
-
-            <span>
-              Hologram HUD v2.6
-            </span>
-
+            <span>Hologram HUD v2.6</span>
           </div>
-
         </div>
       </footer>
-
     </div>
   );
 }

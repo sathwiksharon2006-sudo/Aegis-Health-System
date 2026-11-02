@@ -1,0 +1,404 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Hospital staff and practitioner profile",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth user UID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Staff email address"
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Staff full name and title"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["Doctor", "Nurse", "Admin", "Staff"],
+          "description": "Hospital staff clinical role"
+        },
+        "department": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Clinical department assignment"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Registered hospital patient profile and visit records",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique patient ID like PT-2026-0104"
+        },
+        "nationalId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "National health identification code"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Patient legal full name"
+        },
+        "age": {
+          "type": "number",
+          "description": "Patient age in years"
+        },
+        "dob": {
+          "type": "string",
+          "description": "Date of birth (YYYY-MM-DD)"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["Male", "Female", "Other"],
+          "description": "Gender identification"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Primary contact telephone"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Electronic contact email"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Residential address"
+        },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+          "description": "ABO and Rh blood group"
+        },
+        "allergies": {
+          "type": "array",
+          "description": "Documented medical and drug allergies"
+        },
+        "chronicConditions": {
+          "type": "array",
+          "description": "Pre-existing chronic conditions"
+        },
+        "emergencyContact": {
+          "type": "object",
+          "description": "Next-of-kin emergency contact details"
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "Date first admitted to hospital"
+        },
+        "visitCount": {
+          "type": "number",
+          "description": "Total hospital admissions and visits"
+        },
+        "visits": {
+          "type": "array",
+          "description": "Chronological clinical visit encounters"
+        },
+        "primaryRiskOrgan": {
+          "type": "string",
+          "description": "Anatomical risk organ identified"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Staff UID who registered the patient"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Record last modification timestamp"
+        }
+      },
+      "required": ["id", "fullName", "phone", "bloodGroup", "visitCount", "visits"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Hospital medical doctor roster and real-time clinical availability",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Doctor employee identifier"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Full doctor name"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Clinical title or designation"
+        },
+        "department": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Medical specialty department"
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Clinical sub-specialization"
+        },
+        "roomNumber": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Assigned hospital suite or room"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Available", "In Consultation", "In Surgery", "On Break", "Off Duty"],
+          "description": "Current real-time duty status"
+        },
+        "currentQueue": {
+          "type": "number",
+          "description": "Waiting queue patient count"
+        },
+        "avgWaitMins": {
+          "type": "number",
+          "description": "Estimated patient wait in minutes"
+        },
+        "shiftHours": {
+          "type": "string",
+          "description": "Current shift schedule"
+        },
+        "contactExtension": {
+          "type": "string",
+          "description": "Internal phone extension"
+        },
+        "experienceYears": {
+          "type": "number",
+          "description": "Years in practice"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Patient care rating score"
+        }
+      },
+      "required": ["id", "name", "department", "status"]
+    },
+    "DiseaseReport": {
+      "title": "DiseaseReport",
+      "description": "Multi-cadence epidemiological disease reports and hospital admissions",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Disease tracking identifier"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "Disease or diagnosis name"
+        },
+        "category": {
+          "type": "string",
+          "description": "Disease clinical category"
+        },
+        "icd10": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "ICD-10 clinical diagnostic code"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["Mild", "Moderate", "Severe", "Critical"],
+          "description": "Clinical severity categorization"
+        },
+        "dailyCount": {
+          "type": "number",
+          "description": "Daily incidence count"
+        },
+        "weeklyCount": {
+          "type": "number",
+          "description": "Weekly incidence count"
+        },
+        "monthlyCount": {
+          "type": "number",
+          "description": "Monthly incidence count"
+        },
+        "yearlyCount": {
+          "type": "number",
+          "description": "Yearly incidence count"
+        },
+        "activeCases": {
+          "type": "number",
+          "description": "Currently active ward cases"
+        },
+        "bedOccupancy": {
+          "type": "number",
+          "description": "Beds dedicated to this condition"
+        },
+        "recoveryRate": {
+          "type": "number",
+          "description": "Recovery percentage"
+        },
+        "mortalityRate": {
+          "type": "number",
+          "description": "Mortality percentage"
+        },
+        "trendPercentage": {
+          "type": "number",
+          "description": "Period-over-period trend delta"
+        },
+        "primarySymptoms": {
+          "type": "array",
+          "description": "Cardinal symptoms list"
+        },
+        "primaryDepartment": {
+          "type": "string",
+          "description": "Leading hospital department managing care"
+        }
+      },
+      "required": ["id", "name", "category", "icd10", "severity"]
+    },
+    "AnatomicalRisk": {
+      "title": "AnatomicalRisk",
+      "description": "Hologram scanner anatomical organ risk telemetry and pathology",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Organ key identifier"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Anatomical system display name"
+        },
+        "latinName": {
+          "type": "string",
+          "description": "Medical Latin classification"
+        },
+        "system": {
+          "type": "string",
+          "description": "Biological system name"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["Critical", "High", "Moderate", "Normal"],
+          "description": "Current physiological risk tier"
+        },
+        "riskScore": {
+          "type": "number",
+          "description": "Organ risk score 0 to 100"
+        },
+        "primaryIssue": {
+          "type": "string",
+          "description": "Lead diagnostic finding"
+        },
+        "description": {
+          "type": "string",
+          "description": "Clinical overview"
+        },
+        "vitalTelemetry": {
+          "type": "array",
+          "description": "Real-time biomarker measurements"
+        },
+        "affectedPatientCount": {
+          "type": "number",
+          "description": "Inpatients with this organ at risk"
+        },
+        "samplePatientIds": {
+          "type": "array",
+          "description": "Patient reference keys"
+        },
+        "pathologyRisks": {
+          "type": "array",
+          "description": "Associated differential pathologies"
+        },
+        "recommendedProtocol": {
+          "type": "string",
+          "description": "Emergency clinical response protocol"
+        },
+        "svgCoordinates": {
+          "type": "object",
+          "description": "Hologram visual coordinates"
+        }
+      },
+      "required": ["id", "name", "riskLevel", "riskScore"]
+    },
+    "OverviewMetrics": {
+      "title": "OverviewMetrics",
+      "description": "Hospital aggregated operational metrics and bed capacity",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Metric snapshot identifier"
+        },
+        "yearly": {
+          "type": "object",
+          "description": "Yearly visits and monthly breakdown"
+        },
+        "weekly": {
+          "type": "object",
+          "description": "Weekly visits and daily breakdown"
+        },
+        "daily": {
+          "type": "object",
+          "description": "Daily visits and hourly breakdown"
+        },
+        "departmentLoad": {
+          "type": "array",
+          "description": "Clinical wards bed occupancy census"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Timestamp of metrics calculation"
+        }
+      },
+      "required": ["id", "yearly", "weekly", "daily", "departmentLoad"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Medical and clinical staff member user documents"
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Hospital electronic health records and patient visits"
+    },
+    "/doctors/{doctorId}": {
+      "schema": "Doctor",
+      "description": "Doctor roster and live availability records"
+    },
+    "/disease_reports/{diseaseId}": {
+      "schema": "DiseaseReport",
+      "description": "Epidemiological multi-cadence disease tracking"
+    },
+    "/anatomical_risks/{riskId}": {
+      "schema": "AnatomicalRisk",
+      "description": "Hologram organ risk scores and vital telemetry"
+    },
+    "/overview_metrics/{metricId}": {
+      "schema": "OverviewMetrics",
+      "description": "Hospital-wide operational visits and bed occupancy statistics"
+    }
+  }
+}

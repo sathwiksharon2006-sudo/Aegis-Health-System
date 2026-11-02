@@ -14,16 +14,29 @@ import {
   getFirestore,
   doc,
   getDoc,
+  getDocs,
   getDocFromServer,
   setDoc,
+  updateDoc,
   collection,
   onSnapshot,
   query,
   orderBy,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Patient } from '../types/hospital';
-import { INITIAL_PATIENTS } from '../data/mockHospitalData';
+import {
+  Patient,
+  Doctor,
+  DiseaseReport,
+  AnatomicalRiskPart,
+} from '../types/hospital';
+import {
+  INITIAL_PATIENTS,
+  DOCTORS_ROSTER,
+  DISEASE_REPORTS,
+  ANATOMICAL_RISK_PARTS,
+  VISIT_OVERVIEW_METRICS,
+} from '../data/mockHospitalData';
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
@@ -105,7 +118,10 @@ export interface StaffUserProfile {
 }
 
 // Save or sync user profile in Firestore
-export async function syncUserProfile(user: FirebaseUser, extraData?: { role?: string; department?: string; fullName?: string }): Promise<StaffUserProfile> {
+export async function syncUserProfile(
+  user: FirebaseUser,
+  extraData?: { role?: string; department?: string; fullName?: string }
+): Promise<StaffUserProfile> {
   const userRef = doc(db, 'users', user.uid);
   const now = new Date().toISOString();
 
@@ -116,7 +132,7 @@ export async function syncUserProfile(user: FirebaseUser, extraData?: { role?: s
       existingProfile = snap.data() as StaffUserProfile;
     }
   } catch (err) {
-    // Non-fatal or permissions if not created yet
+    // Non-fatal if initial record doesn't exist yet
   }
 
   const role = (extraData?.role as StaffUserProfile['role']) || existingProfile?.role || 'Doctor';
@@ -142,14 +158,16 @@ export async function syncUserProfile(user: FirebaseUser, extraData?: { role?: s
   return profile;
 }
 
-// Sync/Save a Patient to Firestore database
+// ==========================================
+// 1. PATIENTS FIRESTORE OPERATIONS
+// ==========================================
 export async function savePatientToFirestore(patient: Patient) {
   const path = `patients/${patient.id}`;
   try {
     const patientRef = doc(db, 'patients', patient.id);
     await setDoc(patientRef, {
       ...patient,
-      createdBy: auth.currentUser?.uid || 'staff-system',
+      createdBy: auth.currentUser?.uid || 'system',
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -157,7 +175,6 @@ export async function savePatientToFirestore(patient: Patient) {
   }
 }
 
-// Seed Initial Patients if database collection is empty
 export async function seedInitialPatientsIfEmpty(existingCount: number) {
   if (existingCount > 0 || !auth.currentUser) return;
   try {
@@ -166,5 +183,187 @@ export async function seedInitialPatientsIfEmpty(existingCount: number) {
     }
   } catch (err) {
     console.warn('Seeding initial patients skipped:', err);
+  }
+}
+
+// ==========================================
+// 2. DOCTORS FIRESTORE OPERATIONS
+// ==========================================
+export async function saveDoctorToFirestore(doctor: Doctor) {
+  const path = `doctors/${doctor.id}`;
+  try {
+    const docRef = doc(db, 'doctors', doctor.id);
+    await setDoc(docRef, {
+      ...doctor,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function updateDoctorStatusInFirestore(
+  doctorId: string,
+  newStatus: Doctor['status'],
+  newQueueDelta?: number
+) {
+  const path = `doctors/${doctorId}`;
+  try {
+    const docRef = doc(db, 'doctors', doctorId);
+    const updates: any = {
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    if (typeof newQueueDelta === 'number') {
+      updates.currentQueue = Math.max(0, newQueueDelta);
+    }
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function seedInitialDoctorsIfEmpty(existingCount: number) {
+  if (existingCount > 0 || !auth.currentUser) return;
+  try {
+    for (const docItem of DOCTORS_ROSTER) {
+      await saveDoctorToFirestore(docItem);
+    }
+  } catch (err) {
+    console.warn('Seeding initial doctors skipped:', err);
+  }
+}
+
+// ==========================================
+// 3. DISEASE REPORTS FIRESTORE OPERATIONS
+// ==========================================
+export async function saveDiseaseReportToFirestore(report: DiseaseReport) {
+  const path = `disease_reports/${report.id}`;
+  try {
+    const docRef = doc(db, 'disease_reports', report.id);
+    await setDoc(docRef, {
+      ...report,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function updateDiseaseStatsInFirestore(
+  diseaseId: string,
+  updates: Partial<DiseaseReport>
+) {
+  const path = `disease_reports/${diseaseId}`;
+  try {
+    const docRef = doc(db, 'disease_reports', diseaseId);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function seedInitialDiseaseReportsIfEmpty(existingCount: number) {
+  if (existingCount > 0 || !auth.currentUser) return;
+  try {
+    for (const disease of DISEASE_REPORTS) {
+      await saveDiseaseReportToFirestore(disease);
+    }
+  } catch (err) {
+    console.warn('Seeding disease reports skipped:', err);
+  }
+}
+
+// ==========================================
+// 4. ANATOMICAL RISKS FIRESTORE OPERATIONS
+// ==========================================
+export async function saveAnatomicalRiskToFirestore(risk: AnatomicalRiskPart) {
+  const path = `anatomical_risks/${risk.id}`;
+  try {
+    const docRef = doc(db, 'anatomical_risks', risk.id);
+    await setDoc(docRef, {
+      ...risk,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function updateAnatomicalRiskInFirestore(
+  riskId: string,
+  updates: Partial<AnatomicalRiskPart>
+) {
+  const path = `anatomical_risks/${riskId}`;
+  try {
+    const docRef = doc(db, 'anatomical_risks', riskId);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function seedInitialAnatomicalRisksIfEmpty(existingCount: number) {
+  if (existingCount > 0 || !auth.currentUser) return;
+  try {
+    for (const part of ANATOMICAL_RISK_PARTS) {
+      await saveAnatomicalRiskToFirestore(part);
+    }
+  } catch (err) {
+    console.warn('Seeding anatomical risks skipped:', err);
+  }
+}
+
+// ==========================================
+// 5. OVERVIEW METRICS FIRESTORE OPERATIONS
+// ==========================================
+export async function saveOverviewMetricsToFirestore(metrics: typeof VISIT_OVERVIEW_METRICS) {
+  const path = 'overview_metrics/hospital_telemetry_live';
+  try {
+    const docRef = doc(db, 'overview_metrics', 'hospital_telemetry_live');
+    await setDoc(docRef, {
+      id: 'hospital_telemetry_live',
+      ...metrics,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function seedInitialOverviewMetricsIfEmpty(existing: boolean) {
+  if (existing || !auth.currentUser) return;
+  try {
+    await saveOverviewMetricsToFirestore(VISIT_OVERVIEW_METRICS);
+  } catch (err) {
+    console.warn('Seeding overview metrics skipped:', err);
+  }
+}
+
+// Master seeder for all hospital collections
+export async function seedAllHospitalCollections() {
+  if (!auth.currentUser) return;
+  try {
+    for (const p of INITIAL_PATIENTS) {
+      await savePatientToFirestore(p);
+    }
+    for (const d of DOCTORS_ROSTER) {
+      await saveDoctorToFirestore(d);
+    }
+    for (const dis of DISEASE_REPORTS) {
+      await saveDiseaseReportToFirestore(dis);
+    }
+    for (const r of ANATOMICAL_RISK_PARTS) {
+      await saveAnatomicalRiskToFirestore(r);
+    }
+    await saveOverviewMetricsToFirestore(VISIT_OVERVIEW_METRICS);
+  } catch (err) {
+    console.error('Master seed error:', err);
   }
 }
